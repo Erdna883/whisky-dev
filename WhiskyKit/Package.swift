@@ -31,13 +31,14 @@ let package = Package(
         )
     ],
     dependencies: [
-      .package(url: "git@github.com:SwiftPackageIndex/SemanticVersion.git", from: "0.3.0")
+      .package(url: "https://github.com/SwiftPackageIndex/SemanticVersion.git", from: "0.3.0")
     ],
     targets: [
         .target(
             name: "WhiskyKit",
             dependencies: ["SemanticVersion"]
-        )
+        ),
+        .testTarget(name: "WhiskyKitTests", dependencies: ["WhiskyKit"])
     ],
     swiftLanguageVersions: [.version("6")]
 )

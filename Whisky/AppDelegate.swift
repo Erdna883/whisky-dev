@@ -20,8 +20,6 @@ import Foundation
 import SwiftUI
 
 class AppDelegate: NSObject, NSApplicationDelegate {
-    @AppStorage("hasShownMoveToApplicationsAlert") private var hasShownMoveToApplicationsAlert = false
-
     func application(_ application: NSApplication, open urls: [URL]) {
         // Test if automatic window tabbing is enabled
         // as it is disabled when ContentView appears
@@ -33,13 +31,17 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     func applicationDidFinishLaunching(_ notification: Notification) {
-        if !hasShownMoveToApplicationsAlert && !AppDelegate.insideAppsFolder {
-            DispatchQueue.main.asyncAfter(deadline: .now()) {
-                NSApp.activate(ignoringOtherApps: true)
-                self.showAlertOnFirstLaunch()
-                self.hasShownMoveToApplicationsAlert = true
-            }
+        DispatchQueue.main.async {
+            NSApp.activate(ignoringOtherApps: true)
+            NSApp.windows.first(where: { $0.canBecomeMain })?.makeKeyAndOrderFront(nil)
         }
+    }
+
+    func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows: Bool) -> Bool {
+        if !hasVisibleWindows {
+            sender.windows.first(where: { $0.canBecomeMain })?.makeKeyAndOrderFront(nil)
+        }
+        return true
     }
 
     func applicationWillTerminate(_ notification: Notification) {
@@ -52,38 +54,4 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         return true
     }
 
-    private static var appUrl: URL? {
-        Bundle.main.resourceURL?.deletingLastPathComponent().deletingLastPathComponent()
-    }
-
-    private static let expectedUrl = URL(fileURLWithPath: "/Applications/Whisky.app")
-
-    private static var insideAppsFolder: Bool {
-        if let url = appUrl {
-            return url.path.contains("Xcode") || url.path.contains(expectedUrl.path)
-        }
-        return false
-    }
-
-    @MainActor
-    private func showAlertOnFirstLaunch() {
-        let alert = NSAlert()
-        alert.messageText = String(localized: "showAlertOnFirstLaunch.messageText")
-        alert.informativeText = String(localized: "showAlertOnFirstLaunch.informativeText")
-        alert.addButton(withTitle: String(localized: "showAlertOnFirstLaunch.button.moveToApplications"))
-        alert.addButton(withTitle: String(localized: "showAlertOnFirstLaunch.button.dontMove"))
-
-        let response = alert.runModal()
-
-        if response == .alertFirstButtonReturn {
-            let appURL = Bundle.main.bundleURL
-
-            do {
-                _ = try FileManager.default.replaceItemAt(AppDelegate.expectedUrl, withItemAt: appURL)
-                NSWorkspace.shared.open(AppDelegate.expectedUrl)
-            } catch {
-                print("Failed to move the app: \(error)")
-            }
-        }
-    }
 }

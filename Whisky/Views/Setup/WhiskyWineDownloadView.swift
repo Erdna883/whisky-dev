@@ -20,109 +20,91 @@ import SwiftUI
 import WhiskyKit
 
 struct WhiskyWineDownloadView: View {
-    @State private var fractionProgress: Double = 0
-    @State private var completedBytes: Int64 = 0
-    @State private var totalBytes: Int64 = 0
-    @State private var downloadSpeed: Double = 0
-    @State private var downloadTask: URLSessionDownloadTask?
-    @State private var observation: NSKeyValueObservation?
-    @State private var startTime: Date?
+    @State private var failure: String?
+    @State private var attempt = 0
+    @State private var useNetwork = true
     @Binding var tarLocation: URL
+    @Binding var graphicsLocation: URL
     @Binding var path: [SetupStage]
+
     var body: some View {
-        VStack {
-            VStack {
-                Text("setup.whiskywine.download")
-                    .font(.title)
-                    .fontWeight(.bold)
-                Text("setup.whiskywine.download.subtitle")
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
-                Spacer()
-                VStack {
-                    ProgressView(value: fractionProgress, total: 1)
-                    HStack {
-                        HStack {
-                            Text(String(format: String(localized: "setup.whiskywine.progress"),
-                                        formatBytes(bytes: completedBytes),
-                                        formatBytes(bytes: totalBytes)))
-                            + Text(String(" "))
-                            + (shouldShowEstimate() ?
-                               Text(String(format: String(localized: "setup.whiskywine.eta"),
-                                           formatRemainingTime(remainingBytes: totalBytes - completedBytes)))
-                               : Text(String()))
-                            Spacer()
-                        }
-                        .font(.subheadline)
-                        .monospacedDigit()
-                    }
-                }
-                .padding(.horizontal)
-                Spacer()
+        VStack(spacing: 18) {
+            Text("setup.whiskywine.download").font(.title).bold()
+            Text("runtime.download.subtitle").foregroundStyle(.secondary)
+            if let failure {
+                Text(failure).foregroundStyle(.red).textSelection(.enabled)
+                Button("setup.retry") { useNetwork = true; attempt += 1 }
+            } else {
+                ProgressView()
+                Text("runtime.download.size").font(.caption).foregroundStyle(.secondary)
             }
-            Spacer()
+            Button("runtime.use.downloads") { importDownloads() }
         }
-        .frame(width: 400, height: 200)
-        .onAppear {
-            Task {
-                if let url: URL = URL(string: "https://data.getwhisky.app/Wine/Libraries.tar.gz") {
-                    downloadTask = URLSession(configuration: .ephemeral).downloadTask(with: url) { url, _, _ in
-                        Task.detached {
-                            await MainActor.run {
-                                if let url = url {
-                                    tarLocation = url
-                                    proceed()
-                                }
-                            }
-                        }
-                    }
-                    observation = downloadTask?.observe(\.countOfBytesReceived) { task, _ in
-                        Task {
-                            await MainActor.run {
-                                let currentTime = Date()
-                                let elapsedTime = currentTime.timeIntervalSince(startTime ?? currentTime)
-                                if completedBytes > 0 {
-                                    downloadSpeed = Double(completedBytes) / elapsedTime
-                                }
-                                totalBytes = task.countOfBytesExpectedToReceive
-                                completedBytes = task.countOfBytesReceived
-                                fractionProgress = Double(completedBytes) / Double(totalBytes)
-                            }
-                        }
-                    }
-                    startTime = Date()
-                    downloadTask?.resume()
-                }
+        .frame(width: 440, height: 240)
+        .task(id: attempt) { if useNetwork { await download() } }
+    }
+
+    private func importDownloads() {
+        let panel = NSOpenPanel()
+        panel.canChooseDirectories = false
+        panel.allowsMultipleSelection = true
+        panel.message = String(localized: "runtime.select.archives")
+        guard panel.runModal() == .OK else { return }
+        guard panel.urls.count == 2,
+              let wine = panel.urls.first(where: { $0.lastPathComponent.hasPrefix("wine-") }),
+              let graphics = panel.urls.first(where: { $0.lastPathComponent.hasPrefix("dxvk-") }) else {
+            failure = String(localized: "runtime.select.archives")
+            return
+        }
+        useNetwork = false
+        attempt += 1
+        let directory = FileManager.default.temporaryDirectory
+        let wineCopy = directory.appending(path: "whisky-wine-\(UUID().uuidString).tar")
+        let graphicsCopy = directory.appending(path: "whisky-dxvk-\(UUID().uuidString).tar")
+        do {
+            try FileManager.default.copyItem(at: wine, to: wineCopy)
+            try FileManager.default.copyItem(at: graphics, to: graphicsCopy)
+            tarLocation = wineCopy
+            graphicsLocation = graphicsCopy
+            path.append(.whiskyWineInstall)
+        } catch {
+            try? FileManager.default.removeItem(at: wineCopy)
+            try? FileManager.default.removeItem(at: graphicsCopy)
+            failure = error.localizedDescription
+        }
+    }
+
+    private func download() async {
+        failure = nil
+        do {
+            let wineArchive = try await downloadArchive(from: WhiskyWineInstaller.downloadURL)
+            do {
+                let graphicsArchive = try await downloadArchive(from: WhiskyWineInstaller.graphicsDownloadURL)
+                try Task.checkCancellation()
+                tarLocation = wineArchive
+                graphicsLocation = graphicsArchive
+            } catch {
+                try? FileManager.default.removeItem(at: wineArchive)
+                throw error
             }
+            path.append(.whiskyWineInstall)
+        } catch is CancellationError {
+            return
+        } catch {
+            if !Task.isCancelled { failure = error.localizedDescription }
         }
     }
-
-    func formatBytes(bytes: Int64) -> String {
-        let formatter = ByteCountFormatter()
-        formatter.countStyle = .file
-        formatter.zeroPadsFractionDigits = true
-        return formatter.string(fromByteCount: bytes)
-    }
-
-    func shouldShowEstimate() -> Bool {
-        let elapsedTime = Date().timeIntervalSince(startTime ?? Date())
-        return Int(elapsedTime.rounded()) > 5 && completedBytes != 0
-    }
-
-    func formatRemainingTime(remainingBytes: Int64) -> String {
-        let remainingTimeInSeconds = Double(remainingBytes) / downloadSpeed
-
-        let formatter = DateComponentsFormatter()
-        formatter.allowedUnits = [.hour, .minute, .second]
-        formatter.unitsStyle = .full
-        if shouldShowEstimate() {
-            return formatter.string(from: TimeInterval(remainingTimeInSeconds)) ?? ""
-        } else {
-            return ""
+    private func downloadArchive(from address: String) async throws -> URL {
+        guard let source = URL(string: address) else { throw URLError(.badURL) }
+        let (temporary, response) = try await URLSession.shared.download(from: source)
+        guard let response = response as? HTTPURLResponse, response.statusCode == 200 else {
+            throw URLError(.badServerResponse)
         }
+        try Task.checkCancellation()
+        let destination = FileManager.default.temporaryDirectory
+            .appending(path: "whisky-runtime-\(UUID().uuidString).tar")
+        try FileManager.default.moveItem(at: temporary, to: destination)
+        return destination
     }
 
-    func proceed() {
-        path.append(.whiskyWineInstall)
-    }
 }

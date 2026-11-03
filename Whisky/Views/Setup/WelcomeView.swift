@@ -55,7 +55,7 @@ struct WelcomeView: View {
                 InstallStatusView(isInstalled: $whiskyWineInstalled,
                                   shouldCheckInstallStatus: $shouldCheckInstallStatus,
                                   showUninstall: true,
-                                  name: "WhiskyWine")
+                                  name: "Wine 11.21")
             }
             .formStyle(.grouped)
             .scrollDisabled(true)
@@ -145,7 +145,7 @@ struct InstallStatusView: View {
     }
 
     func uninstall() {
-        if name == "WhiskyWine" {
+        if name == "Wine 11.21" {
             WhiskyWineInstaller.uninstall()
         }
 

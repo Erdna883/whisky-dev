@@ -82,11 +82,6 @@ struct ConfigView: View {
                             }
                         })
                 }
-                Picker("config.enhancedSync", selection: $bottle.settings.enhancedSync) {
-                    Text("config.enhancedSync.none").tag(EnhancedSync.none)
-                    Text("config.enhacnedSync.esync").tag(EnhancedSync.esync)
-                    Text("config.enhacnedSync.msync").tag(EnhancedSync.msync)
-                }
                 SettingItemView(title: "config.dpi", loadingState: dpiConfigLoadingState) {
                     Button("config.inspect") {
                         dpiSheetPresented = true
@@ -117,14 +112,8 @@ struct ConfigView: View {
                     }
                 }
             }
-            Section("config.title.dxvk", isExpanded: $dxvkSectionExpanded) {
-                Toggle(isOn: $bottle.settings.dxvk) {
-                    Text("config.dxvk")
-                }
-                Toggle(isOn: $bottle.settings.dxvkAsync) {
-                    Text("config.dxvk.async")
-                }
-                .disabled(!bottle.settings.dxvk)
+            Section("runtime.graphics.title") {
+                Toggle("config.dxvk", isOn: $bottle.settings.dxvk)
                 Picker("config.dxvkHud", selection: $bottle.settings.dxvkHud) {
                     Text("config.dxvkHud.full").tag(DXVKHUD.full)
                     Text("config.dxvkHud.partial").tag(DXVKHUD.partial)
@@ -132,6 +121,7 @@ struct ConfigView: View {
                     Text("config.dxvkHud.off").tag(DXVKHUD.off)
                 }
                 .disabled(!bottle.settings.dxvk)
+                Text("runtime.graphics.description").foregroundStyle(.secondary)
             }
             Section("config.title.metal", isExpanded: $metalSectionExpanded) {
                 Toggle(isOn: $bottle.settings.metalHud) {
@@ -141,15 +131,7 @@ struct ConfigView: View {
                     Text("config.metalTrace")
                     Text("config.metalTrace.info")
                 }
-                if let device = MTLCreateSystemDefaultDevice() {
-                    // Represents the Apple family 9 GPU features that correspond to the Apple A17, M3, and M4 GPUs.
-                    if device.supportsFamily(.apple9) {
-                        Toggle(isOn: $bottle.settings.dxrEnabled) {
-                            Text("config.dxr")
-                            Text("config.dxr.info")
-                        }
-                    }
-                }
+
             }
         }
         .formStyle(.grouped)

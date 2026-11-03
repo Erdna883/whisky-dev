@@ -20,10 +20,8 @@ import Foundation
 import os.log
 
 public class Wine {
-    /// URL to the installed `DXVK` folder
-    private static let dxvkFolder: URL = WhiskyWineInstaller.libraryFolder.appending(path: "DXVK")
-    /// Path to the `wine64` binary
-    public static let wineBinary: URL = WhiskyWineInstaller.binFolder.appending(path: "wine64")
+    /// Path to the `wine` binary
+    public static let wineBinary: URL = WhiskyWineInstaller.binFolder.appending(path: "wine")
     /// Parth to the `wineserver` binary
     private static let wineserverBinary: URL = WhiskyWineInstaller.binFolder.appending(path: "wineserver")
 
@@ -36,7 +34,10 @@ public class Wine {
         process.executableURL = executableURL
         process.arguments = args
         process.currentDirectoryURL = directory ?? executableURL.deletingLastPathComponent()
-        process.environment = environment
+        let inherited = ProcessInfo.processInfo.environment.filter { key, _ in
+            ["PATH", "HOME", "USER", "LOGNAME", "TMPDIR", "LANG"].contains(key) || key.hasPrefix("LC_")
+        }
+        process.environment = inherited.merging(environment, uniquingKeysWith: { $1 })
         process.qualityOfService = .userInitiated
 
         return try process.runStream(
@@ -98,45 +99,97 @@ public class Wine {
 
     /// Execute a `wine start /unix {url}` command returning the output result
     public static func runProgram(
-        at url: URL, args: [String] = [], bottle: Bottle, environment: [String: String] = [:]
+        at url: URL, args: [String] = [], bottle: Bottle, environment: [String: String] = [:],
+        onStarted: (@MainActor @Sendable () -> Void)? = nil
     ) async throws {
-        if bottle.settings.dxvk {
-            try enableDXVK(bottle: bottle)
+        let isSteam = url.lastPathComponent.lowercased() == "steam.exe"
+        let reservation = isSteam ? await SteamLaunchGate.shared.reserve(for: url) : nil
+        if isSteam && reservation == nil {
+            await onStarted?()
+            return
         }
+        do {
+            let launchArguments = try preparedProgramArguments(at: url, bottle: bottle, args: args)
+            for await output in try Self.runWineProcess(
+                name: url.lastPathComponent,
+                args: ["start", "/unix", url.path(percentEncoded: false)] + launchArguments,
+                bottle: bottle, environment: environment
+            ) {
+                if case .started = output {
+                    await onStarted?()
+                    if isSteam { await synchronizeSteamAutorun(bottle: bottle) }
+                }
+                if case .terminated(let process) = output, process.terminationStatus != 0 {
+                    throw WineInterfaceError.processFailed(process.terminationStatus)
+                }
+            }
+        } catch {
+            if let reservation { await SteamLaunchGate.shared.cancel(for: url, token: reservation) }
+            throw error
+        }
+    }
 
-        for await _ in try Self.runWineProcess(
-            name: url.lastPathComponent,
-            args: ["start", "/unix", url.path(percentEncoded: false)] + args,
-            bottle: bottle, environment: environment
-        ) { }
+    private static func synchronizeSteamAutorun(bottle: Bottle) async {
+        let preferences = UserDefaults(suiteName: Bundle.whiskyBundleIdentifier) ?? .standard
+        let enabled = preferences.object(forKey: "steamBrowserCompatibility") as? Bool ?? true
+        do {
+            guard let command = try SteamBrowserCompatibility.autorunCommand(in: bottle.url, enabled: enabled) else {
+                return
+            }
+            try await runWine([
+                "reg", "add", #"HKCU\Software\Microsoft\Windows\CurrentVersion\Run"#,
+                "/v", "Steam", "/t", "REG_SZ", "/d", command, "/f"
+            ], bottle: bottle)
+        } catch {
+            Logger.wineKit.warning("Could not synchronize Steam's bottle startup flags: \(error)")
+        }
+    }
+
+    static func preparedProgramArguments(
+        at url: URL, bottle: Bottle, args: [String], adaptersFolder: URL? = nil
+    ) throws -> [String] {
+        if bottle.settings.dxvk { try prepareGraphics(for: bottle) }
+        guard url.lastPathComponent.lowercased() == "steam.exe" else { return args }
+        let preferences = UserDefaults(suiteName: Bundle.whiskyBundleIdentifier) ?? .standard
+        let enabled = preferences.object(forKey: "steamBrowserCompatibility") as? Bool ?? true
+        let resources = adaptersFolder
+            ?? Bundle.main.url(forResource: "SteamBrowserAdapters", withExtension: nil)
+            ?? Bundle.main.executableURL?.deletingLastPathComponent().appending(path: "SteamBrowserAdapters")
+        guard let resources else { throw WineInterfaceError.invalidResponce }
+        let extra = try SteamBrowserCompatibility.prepare(
+            steamExecutable: url, adaptersFolder: resources, enabled: enabled
+        )
+        return args + extra.filter { !args.contains($0) }
     }
 
     public static func generateRunCommand(
-        at url: URL, bottle: Bottle, args: String, environment: [String: String]
-    ) -> String {
-        var wineCmd = "\(wineBinary.esc) start /unix \(url.esc) \(args)"
+        at url: URL, bottle: Bottle, args: String, environment: [String: String], adaptersFolder: URL? = nil
+    ) throws -> String {
+        let extra = try preparedProgramArguments(at: url, bottle: bottle, args: [], adaptersFolder: adaptersFolder)
+        let flags = extra.filter { !args.split(whereSeparator: \.isWhitespace).contains(Substring($0)) }
+            .map(\.esc).joined(separator: " ")
+        var wineCmd = "\(wineBinary.esc) start /unix \(url.esc) \(args) \(flags)"
         let env = constructWineEnvironment(for: bottle, environment: environment)
         for environment in env {
             wineCmd = "\(environment.key)=\"\(environment.value)\" " + wineCmd
         }
-
         return wineCmd
     }
 
     public static func generateTerminalEnvironmentCommand(bottle: Bottle) -> String {
         var cmd = """
         export PATH=\"\(WhiskyWineInstaller.binFolder.path):$PATH\"
-        export WINE=\"wine64\"
-        alias wine=\"wine64\"
-        alias winecfg=\"wine64 winecfg\"
-        alias msiexec=\"wine64 msiexec\"
-        alias regedit=\"wine64 regedit\"
-        alias regsvr32=\"wine64 regsvr32\"
-        alias wineboot=\"wine64 wineboot\"
-        alias wineconsole=\"wine64 wineconsole\"
-        alias winedbg=\"wine64 winedbg\"
-        alias winefile=\"wine64 winefile\"
-        alias winepath=\"wine64 winepath\"
+        export WINE=\"wine\"
+        alias wine=\"wine\"
+        alias winecfg=\"wine winecfg\"
+        alias msiexec=\"wine msiexec\"
+        alias regedit=\"wine regedit\"
+        alias regsvr32=\"wine regsvr32\"
+        alias wineboot=\"wine wineboot\"
+        alias wineconsole=\"wine wineconsole\"
+        alias winedbg=\"wine winedbg\"
+        alias winefile=\"wine winefile\"
+        alias winepath=\"wine winepath\"
         """
 
         let env = constructWineEnvironment(for: bottle, environment: constructWineEnvironment(for: bottle))
@@ -182,8 +235,12 @@ public class Wine {
 
         for await output in try runWineProcess(args: args, environment: environment, fileHandle: fileHandle) {
             switch output {
-            case .started, .terminated:
+            case .started:
                 break
+            case .terminated(let process):
+                if process.terminationStatus != 0 {
+                    throw WineInterfaceError.processFailed(process.terminationStatus)
+                }
             case .message(let message), .error(let message):
                 result.append(message)
             }
@@ -214,15 +271,20 @@ public class Wine {
         }
     }
 
-    public static func enableDXVK(bottle: Bottle) throws {
-        try FileManager.default.replaceDLLs(
-            in: bottle.url.appending(path: "drive_c").appending(path: "windows").appending(path: "system32"),
-            withContentsIn: Wine.dxvkFolder.appending(path: "x64")
-        )
-        try FileManager.default.replaceDLLs(
-            in: bottle.url.appending(path: "drive_c").appending(path: "windows").appending(path: "syswow64"),
-            withContentsIn: Wine.dxvkFolder.appending(path: "x32")
-        )
+    private static func prepareGraphics(for bottle: Bottle) throws {
+        for (architecture, windowsDirectory) in [("x64", "system32"), ("x32", "syswow64")] {
+            let destination = bottle.url.appending(path: "drive_c/windows/\(windowsDirectory)")
+            for name in ["d3d11.dll", "d3d10core.dll"] {
+                let source = WhiskyWineInstaller.graphicsFolder.appending(path: "\(architecture)/\(name)")
+                let target = destination.appending(path: name)
+                if !FileManager.default.contentsEqual(atPath: source.path, andPath: target.path) {
+                    if FileManager.default.fileExists(atPath: target.path) {
+                        try FileManager.default.removeItem(at: target)
+                    }
+                    try FileManager.default.copyItem(at: source, to: target)
+                }
+            }
+        }
     }
 
     /// Construct an environment merging the bottle values with the given values
@@ -231,6 +293,7 @@ public class Wine {
     ) -> [String: String] {
         var result: [String: String] = [
             "WINEPREFIX": bottle.url.path,
+            "WHISKY_STEAM_BROWSER_MODE": SteamBrowserMode.selected().rawValue,
             "WINEDEBUG": "fixme-all",
             "GST_DEBUG": "1"
         ]
@@ -255,8 +318,18 @@ public class Wine {
     }
 }
 
-enum WineInterfaceError: Error {
+enum WineInterfaceError: LocalizedError {
     case invalidResponce
+    case processFailed(Int32)
+
+    var errorDescription: String? {
+        switch self {
+        case .invalidResponce:
+            return "Wine returned an unexpected response. Check the bottle log."
+        case .processFailed(let status):
+            return "Wine exited with status \(status). Open the logs for details."
+        }
+    }
 }
 
 enum RegistryType: String {

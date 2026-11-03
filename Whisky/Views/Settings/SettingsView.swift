@@ -20,9 +20,9 @@ import SwiftUI
 import WhiskyKit
 
 struct SettingsView: View {
-    @AppStorage("SUEnableAutomaticChecks") var whiskyUpdate = true
+    @AppStorage("steamBrowserMode") var steamBrowserMode = SteamBrowserMode.compatibility.rawValue
+    @AppStorage("steamBrowserCompatibility") var steamBrowserCompatibility = true
     @AppStorage("killOnTerminate") var killOnTerminate = true
-    @AppStorage("checkWhiskyWineUpdates") var checkWhiskyWineUpdates = true
     @AppStorage("defaultBottleLocation") var defaultBottleLocation = BottleData.defaultBottleDir
 
     var body: some View {
@@ -47,9 +47,20 @@ struct SettingsView: View {
                     }
                 }
             }
-            Section("settings.updates") {
-                Toggle("settings.toggle.whisky.updates", isOn: $whiskyUpdate)
-                Toggle("settings.toggle.whiskywine.updates", isOn: $checkWhiskyWineUpdates)
+            Section("steam.settings") {
+                Toggle("steam.compatibility", isOn: $steamBrowserCompatibility)
+                Picker("steam.browser.mode", selection: $steamBrowserMode) {
+                    Text("steam.mode.compatibility").tag(SteamBrowserMode.compatibility.rawValue)
+                    Text("steam.mode.responsive").tag(SteamBrowserMode.responsive.rawValue)
+                }
+                .disabled(!steamBrowserCompatibility)
+                Text("steam.browser.mode.description").foregroundStyle(.secondary)
+                Text("steam.compatibility.description").foregroundStyle(.secondary)
+            }
+            Section("runtime.title") {
+                LabeledContent("runtime.version", value: WhiskyWineInstaller.runtimeVersion)
+                Text("runtime.updates.manual")
+                    .foregroundStyle(.secondary)
             }
         }
         .formStyle(.grouped)

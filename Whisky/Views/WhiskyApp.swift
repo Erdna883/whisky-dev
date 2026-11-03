@@ -17,7 +17,6 @@
 //
 
 import SwiftUI
-import Sparkle
 import WhiskyKit
 
 @main
@@ -25,16 +24,8 @@ struct WhiskyApp: App {
     @State var showSetup: Bool = false
     @NSApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
     @Environment(\.openURL) var openURL
-    private let updaterController: SPUStandardUpdaterController
-
-    init() {
-        updaterController = SPUStandardUpdaterController(startingUpdater: true,
-                                                         updaterDelegate: nil,
-                                                         userDriverDelegate: nil)
-    }
-
     var body: some Scene {
-        WindowGroup {
+        WindowGroup("Whisky Dev", id: "main") {
             ContentView(showSetup: $showSetup)
                 .frame(minWidth: ViewWidth.large, minHeight: 316)
                 .environmentObject(BottleVM.shared)
@@ -46,21 +37,11 @@ struct WhiskyApp: App {
                     }
                 }
         }
-        // Don't ask me how this works, it just does
-        .handlesExternalEvents(matching: ["{same path of URL?}"])
         .commands {
-            CommandGroup(after: .appInfo) {
-                SparkleView(updater: updaterController.updater)
-            }
             CommandGroup(before: .systemServices) {
                 Divider()
                 Button("open.setup") {
                     showSetup = true
-                }
-                Button("install.cli") {
-                    Task {
-                        await WhiskyCmd.install()
-                    }
                 }
             }
             CommandGroup(replacing: .newItem) {}

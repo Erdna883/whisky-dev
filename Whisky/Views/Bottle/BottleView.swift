@@ -29,8 +29,8 @@ enum BottleStage {
 struct BottleView: View {
     @ObservedObject var bottle: Bottle
     @State private var path = NavigationPath()
+    @State private var steamLaunchStarted: Date?
     @State private var programLoading: Bool = false
-    @State private var showWinetricksSheet: Bool = false
 
     private let gridLayout = [GridItem(.adaptive(minimum: 100, maximum: .infinity))]
 
@@ -62,15 +62,17 @@ struct BottleView: View {
             }
             .bottomBar {
                 HStack {
+                    Button(steamLaunchStarted == nil ? "steam.action" : "steam.starting") {
+                        Task { await openSteam() }
+                    }
+                    .disabled(programLoading || steamLaunchStarted != nil)
+                    .help("steam.help")
                     Spacer()
                     Button("button.cDrive") {
                         bottle.openCDrive()
                     }
                     Button("button.terminal") {
                         bottle.openTerminal()
-                    }
-                    Button("button.winetricks") {
-                        showWinetricksSheet.toggle()
                     }
                     Button("button.run") {
                         let panel = NSOpenPanel()
@@ -93,7 +95,7 @@ struct BottleView: View {
                                                 try await Wine.runProgram(at: url, bottle: bottle)
                                             }
                                         } catch {
-                                            print("Failed to run external program: \(error)")
+                                            showLaunchError(error)
                                         }
                                         programLoading = false
                                     }
@@ -119,8 +121,12 @@ struct BottleView: View {
             }
             .disabled(!bottle.isAvailable)
             .navigationTitle(bottle.settings.name)
-            .sheet(isPresented: $showWinetricksSheet) {
-                WinetricksView(bottle: bottle)
+            .task(id: steamLaunchStarted) {
+                guard steamLaunchStarted != nil else { return }
+                do {
+                    try await Task.sleep(for: .seconds(12))
+                    steamLaunchStarted = nil
+                } catch { }
             }
             .onChange(of: bottle.settings) { oldValue, newValue in
                 guard oldValue != newValue else { return }
@@ -143,6 +149,49 @@ struct BottleView: View {
                 ProgramView(program: program)
             }
         }
+    }
+
+    @MainActor
+    private func openSteam() async {
+        guard steamLaunchStarted == nil else { return }
+        steamLaunchStarted = Date()
+        programLoading = true
+        defer { programLoading = false }
+        do {
+            let steam = ["Program Files (x86)", "Program Files"].map {
+                bottle.url.appending(path: "drive_c/\($0)/Steam/steam.exe")
+            }.first { FileManager.default.fileExists(atPath: $0.path) }
+            if let steam {
+                try await Wine.runProgram(at: steam, bottle: bottle, onStarted: { programLoading = false })
+            } else {
+                guard let source = URL(string: "https://cdn.fastly.steamstatic.com/client/installer/SteamSetup.exe") else {
+                    throw URLError(.badURL)
+                }
+                let (download, response) = try await URLSession.shared.download(from: source)
+                guard let response = response as? HTTPURLResponse, response.statusCode == 200 else {
+                    throw URLError(.badServerResponse)
+                }
+                let installers = WhiskyWineInstaller.applicationFolder.appending(path: "Installers")
+                try FileManager.default.createDirectory(at: installers, withIntermediateDirectories: true)
+                let installer = installers.appending(path: "SteamSetup-\(UUID().uuidString).exe")
+                // Keep the installer while Wine's child process is using it.
+                try FileManager.default.moveItem(at: download, to: installer)
+                try await Wine.runProgram(at: installer, bottle: bottle, onStarted: { programLoading = false })
+            }
+            updateStartMenu()
+        } catch {
+            steamLaunchStarted = nil
+            showLaunchError(error)
+        }
+    }
+
+    @MainActor
+    private func showLaunchError(_ error: Error) {
+        let alert = NSAlert()
+        alert.messageText = String(localized: "alert.message")
+        alert.informativeText = error.localizedDescription
+        alert.alertStyle = .critical
+        alert.runModal()
     }
 
     private func updateStartMenu() {

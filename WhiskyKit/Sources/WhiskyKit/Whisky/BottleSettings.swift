@@ -90,10 +90,10 @@ public enum EnhancedSync: Codable, Equatable {
 }
 
 public struct BottleWineConfig: Codable, Equatable {
-    static let defaultWineVersion = SemanticVersion(7, 7, 0)
+    static let defaultWineVersion = SemanticVersion(11, 21, 0)
     var wineVersion: SemanticVersion = Self.defaultWineVersion
     var windowsVersion: WinVersion = .win10
-    var enhancedSync: EnhancedSync = .msync
+    var enhancedSync: EnhancedSync = .none
     var avxEnabled: Bool = false
 
     public init() {}
@@ -103,7 +103,7 @@ public struct BottleWineConfig: Codable, Equatable {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         self.wineVersion = try container.decodeIfPresent(SemanticVersion.self, forKey: .wineVersion) ?? Self.defaultWineVersion
         self.windowsVersion = try container.decodeIfPresent(WinVersion.self, forKey: .windowsVersion) ?? .win10
-        self.enhancedSync = try container.decodeIfPresent(EnhancedSync.self, forKey: .enhancedSync) ?? .msync
+        self.enhancedSync = try container.decodeIfPresent(EnhancedSync.self, forKey: .enhancedSync) ?? .none
         self.avxEnabled = try container.decodeIfPresent(Bool.self, forKey: .avxEnabled) ?? false
     }
     // swiftlint:enable line_length
@@ -129,16 +129,16 @@ public enum DXVKHUD: Codable, Equatable {
 }
 
 public struct BottleDXVKConfig: Codable, Equatable {
-    var dxvk: Bool = false
-    var dxvkAsync: Bool = true
+    var dxvk: Bool = true
+    var dxvkAsync: Bool = false
     var dxvkHud: DXVKHUD = .off
 
     public init() {}
 
     public init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
-        self.dxvk = try container.decodeIfPresent(Bool.self, forKey: .dxvk) ?? false
-        self.dxvkAsync = try container.decodeIfPresent(Bool.self, forKey: .dxvkAsync) ?? true
+        self.dxvk = try container.decodeIfPresent(Bool.self, forKey: .dxvk) ?? true
+        self.dxvkAsync = try container.decodeIfPresent(Bool.self, forKey: .dxvkAsync) ?? false
         self.dxvkHud = try container.decodeIfPresent(DXVKHUD.self, forKey: .dxvkHud) ?? .off
     }
 }
@@ -279,37 +279,16 @@ public struct BottleSettings: Codable, Equatable {
 
     // swiftlint:disable:next cyclomatic_complexity
     public func environmentVariables(wineEnv: inout [String: String]) {
+        // macOS DXVK supplies d3d11/d3d10core; Wine provides DXGI.
+        wineEnv["WINEDLLOVERRIDES"] = dxvk ? "d3d11,d3d10core=n,b" : "d3d11,d3d10core=b"
         if dxvk {
-            wineEnv.updateValue("dxgi,d3d9,d3d10core,d3d11=n,b", forKey: "WINEDLLOVERRIDES")
             switch dxvkHud {
-            case .full:
-                wineEnv.updateValue("full", forKey: "DXVK_HUD")
-            case .partial:
-                wineEnv.updateValue("devinfo,fps,frametimes", forKey: "DXVK_HUD")
-            case .fps:
-                wineEnv.updateValue("fps", forKey: "DXVK_HUD")
-            case .off:
-                break
+            case .full: wineEnv["DXVK_HUD"] = "full"
+            case .partial: wineEnv["DXVK_HUD"] = "devinfo,fps,frametimes"
+            case .fps: wineEnv["DXVK_HUD"] = "fps"
+            case .off: break
             }
         }
-
-        if dxvkAsync {
-            wineEnv.updateValue("1", forKey: "DXVK_ASYNC")
-        }
-
-        switch enhancedSync {
-        case .none:
-            break
-        case .esync:
-            wineEnv.updateValue("1", forKey: "WINEESYNC")
-        case .msync:
-            wineEnv.updateValue("1", forKey: "WINEMSYNC")
-            // D3DM detects ESYNC and changes behaviour accordingly
-            // so we have to lie to it so that it doesn't break
-            // under MSYNC. Values hardcoded in lid3dshared.dylib
-            wineEnv.updateValue("1", forKey: "WINEESYNC")
-        }
-
         if metalHud {
             wineEnv.updateValue("1", forKey: "MTL_HUD_ENABLED")
         }
@@ -322,8 +301,6 @@ public struct BottleSettings: Codable, Equatable {
             wineEnv.updateValue("1", forKey: "ROSETTA_ADVERTISE_AVX")
         }
 
-        if dxrEnabled {
-            wineEnv.updateValue("1", forKey: "D3DM_SUPPORT_DXR")
-        }
+
     }
 }

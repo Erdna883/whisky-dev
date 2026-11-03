@@ -1,52 +1,31 @@
-<div align="center">
+# Whisky Dev
 
-  # Whisky 🥃 
-  *Wine but a bit stronger*
-  
-  ![](https://img.shields.io/github/actions/workflow/status/IsaacMarovitz/Whisky/SwiftLint.yml?style=for-the-badge)
-  [![](https://img.shields.io/discord/1115955071549702235?style=for-the-badge)](https://discord.gg/CsqAfs9CnM)
-</div>
+An unofficial experimental fork of [Whisky](https://github.com/Whisky-App/Whisky), based on upstream commit `fd5480a7`. This is not an official continuation or a CrossOver-equivalent product.
 
-## Maintenance Notice
+## Current build: 0.1.3
 
-[Whisky is no longer actively maintained](https://docs.getwhisky.app/maintenance-notice). Apps and games may break at any time.
+- Native SwiftUI bottle management with a pinned Wine 11.21 runtime and macOS DXVK 1.10.3.
+- Runtime downloads verified using SHA-256, with offline archive import and replacement rollback.
+- Steam installation and managed launch, browser compatibility adapters, and duplicate-launch suppression.
+- Two Steam browser modes: Compatibility (default) and Responsive (experimental).
 
-<img width="650" alt="Config" src="https://github.com/Whisky-App/Whisky/assets/42140194/d0a405e8-76ee-48f0-92b5-165d184a576b">
+Responsive mode has been reported visible and noticeably faster after restart on one M3 Pro Mac with 18 GB memory. This is Steam UI validation, not a game-performance benchmark. ULTRAKILL and Persona 4 Golden gameplay have not yet been verified. DirectX 12 and D3DMetal are not included.
 
-Familiar UI that integrates seamlessly with macOS
+## Build and development
 
-<div align="right">
-  <img width="650" alt="New Bottle" src="https://github.com/Whisky-App/Whisky/assets/42140194/ed1a0d69-d8fb-442b-9330-6816ba8981ba">
+See [LOCAL_DEVELOPMENT.md](LOCAL_DEVELOPMENT.md) for build commands, runtime requirements, tests, and the code map. Current local validation: an ad hoc signed Debug build and 18 passing tests. This is not a notarized public release.
 
-  One-click bottle creation and management
-</div>
+```sh
+git clone https://github.com/Erdna883/whisky-dev.git
+cd whisky-dev
+SKIP_SWIFTLINT=YES bash scripts/build-local.sh
+```
 
-<img width="650" alt="debug" src="https://user-images.githubusercontent.com/42140194/229176642-57b80801-d29b-4123-b1c2-f3b31408ffc6.png">
+The Steam browser adapters are built from `scripts/steam-browser/adapter.c` using `scripts/build-steam-adapter.sh`. The original Valve browser executable is not included in this repository. Runtime archives are downloaded separately; Steam accounts, bottles, and games are not part of the source tree.
 
-Debug and profile with ease
+## License and provenance
 
----
-
-Whisky provides a clean and easy to use graphical wrapper for Wine built in native SwiftUI. You can make and manage bottles, install and run Windows apps and games, and unlock the full potential of your Mac with no technical knowledge required. Whisky is built on top of CrossOver 22.1.1, and Apple's own `Game Porting Toolkit`.
-
-Translated on [Crowdin](https://crowdin.com/project/whisky).
-
----
-
-## System Requirements
-- CPU: Apple Silicon (M-series chips)
-- OS: macOS Sonoma 14.0 or later
-
-## Homebrew
-
-Whisky is on homebrew! Install with 
-`brew install --cask whisky`.
-
-## My game isn't working!
-
-Some games need special steps to get working. Check out the [wiki](https://github.com/IsaacMarovitz/Whisky/wiki/Game-Support).
-
----
+This modified version retains Whisky's GNU GPL v3 license; see [LICENSE](LICENSE). Fork changes were made in November 2026. Original copyright notices and acknowledgments are retained. Dependencies and downloaded runtimes have their own license obligations. Upstream release publishing and funding configuration have been removed from this fork.
 
 ## Credits & Acknowledgments
 

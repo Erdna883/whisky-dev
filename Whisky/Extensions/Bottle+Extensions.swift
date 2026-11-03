@@ -62,15 +62,13 @@ extension Bottle {
             .appending(path: "Windows")
             .appending(path: "Start Menu")
 
-        let userStartMenu = url
-            .appending(path: "drive_c")
-            .appending(path: "users")
-            .appending(path: "crossover")
-            .appending(path: "AppData")
-            .appending(path: "Roaming")
-            .appending(path: "Microsoft")
-            .appending(path: "Windows")
-            .appending(path: "Start Menu")
+        let users = url.appending(path: "drive_c/users")
+        let userFolders = (try? FileManager.default.contentsOfDirectory(
+            at: users, includingPropertiesForKeys: [.isDirectoryKey], options: [.skipsHiddenFiles]
+        )) ?? []
+        let userStartMenus = userFolders.map {
+            $0.appending(path: "AppData/Roaming/Microsoft/Windows/Start Menu")
+        }
 
         var startMenuPrograms: [Program] = []
         var linkURLs: [URL] = []
@@ -83,12 +81,12 @@ extension Bottle {
             }
         }
 
-        let userEnumerator = FileManager.default.enumerator(at: userStartMenu,
-                                                            includingPropertiesForKeys: [.isRegularFileKey],
-                                                            options: [.skipsHiddenFiles])
-        while let url = userEnumerator?.nextObject() as? URL {
-            if url.pathExtension == "lnk" {
-                linkURLs.append(url)
+        for userStartMenu in userStartMenus {
+            let userEnumerator = FileManager.default.enumerator(
+                at: userStartMenu, includingPropertiesForKeys: [.isRegularFileKey], options: [.skipsHiddenFiles]
+            )
+            while let url = userEnumerator?.nextObject() as? URL {
+                if url.pathExtension == "lnk" { linkURLs.append(url) }
             }
         }
 

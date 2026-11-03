@@ -16899,7 +16899,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Welcome to Whisky"
+            "value" : "Welcome to Whisky Dev"
           }
         },
         "es" : {
@@ -17035,7 +17035,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Let's get you set up. This won't take a minute."
+            "value" : "Set up the runtime for Windows applications."
           }
         },
         "es" : {
@@ -17171,7 +17171,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Downloading WhiskyWine"
+            "value" : "Download Wine"
           }
         },
         "es" : {
@@ -17579,7 +17579,7 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Installing WhiskyWine"
+            "value" : "Install Wine"
           }
         },
         "es" : {
@@ -20681,6 +20681,226 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "執行Winetricks指令"
+          }
+        }
+      }
+    },
+    "runtime.download.again" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Download again"
+          }
+        }
+      }
+    },
+    "runtime.download.size" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "About 229 MB. Download time depends on your connection."
+          }
+        }
+      }
+    },
+    "runtime.download.subtitle" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Downloading Wine 11.21 and macOS DXVK"
+          }
+        }
+      }
+    },
+    "runtime.graphics.pending" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Additional DirectX graphics layers are not packaged in this build yet."
+          }
+        }
+      }
+    },
+    "runtime.graphics.title" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Game graphics"
+          }
+        }
+      }
+    },
+    "runtime.install.verifying" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Checking the download and installing Wine…"
+          }
+        }
+      }
+    },
+    "runtime.title" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Wine runtime"
+          }
+        }
+      }
+    },
+    "runtime.updates.manual" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This development build uses a pinned runtime. Updates are installed manually."
+          }
+        }
+      }
+    },
+    "runtime.version" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Packaged Wine version"
+          }
+        }
+      }
+    },
+    "runtime.graphics.description" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "DXVK translates DirectX 10/11 through Vulkan and Metal. Game compatibility is being tested."
+          }
+        }
+      }
+    },
+    "runtime.use.downloads" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Use downloaded archives…"
+          }
+        }
+      }
+    },
+    "runtime.select.archives" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Select both the wine- and dxvk- runtime archives."
+          }
+        }
+      }
+    },
+    "steam.action" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Steam…"
+          }
+        }
+      }
+    },
+    "steam.help" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Install or launch Windows Steam in this bottle."
+          }
+        }
+      }
+    },
+    "steam.settings" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Steam"
+          }
+        }
+      }
+    },
+    "steam.compatibility" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Steam browser compatibility"
+          }
+        }
+      }
+    },
+    "steam.compatibility.description" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Uses a browser adapter and skips Steam startup file repair to preserve it. Normal Steam update checks remain enabled."
+          }
+        }
+      }
+    },
+    "steam.starting" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Starting Steam…"
+          }
+        }
+      }
+    },
+    "steam.browser.mode" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Browser mode"
+          }
+        }
+      }
+    },
+    "steam.mode.compatibility" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Compatibility"
+          }
+        }
+      }
+    },
+    "steam.mode.responsive" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Responsive (experimental)"
+          }
+        }
+      }
+    },
+    "steam.browser.mode.description" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Responsive can improve Library navigation. Quit Steam before switching modes. Use Compatibility if pages are blank."
           }
         }
       }

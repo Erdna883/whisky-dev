@@ -46,14 +46,20 @@ extension Program {
         }
     }
 
-    public func generateTerminalCommand() -> String {
-        return Wine.generateRunCommand(
+    public func generateTerminalCommand() throws -> String {
+        return try Wine.generateRunCommand(
             at: self.url, bottle: bottle, args: settings.arguments, environment: generateEnvironment()
         )
     }
 
     public func runInTerminal() {
-        let wineCmd = generateTerminalCommand().replacingOccurrences(of: "\\", with: "\\\\")
+        let wineCmd: String
+        do {
+            wineCmd = try generateTerminalCommand().replacingOccurrences(of: "\\", with: "\\\\")
+        } catch {
+            Task { @MainActor in self.showRunError(message: error.localizedDescription) }
+            return
+        }
 
         let script = """
         tell application "Terminal"

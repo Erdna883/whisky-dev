@@ -28,10 +28,11 @@ class ProgramShortcut {
         do {
             try FileManager.default.createDirectory(at: macos, withIntermediateDirectories: true)
 
-            // First create shell script
+            // Prepare compatibility before exporting the command as well.
+            let command = try program.generateTerminalCommand()
             let script = """
             #!/bin/bash
-            \(program.generateTerminalCommand())
+            \(command)
             """
             let scriptUrl = macos.appending(path: "launch")
             try script.write(to: scriptUrl,

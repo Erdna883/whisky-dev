@@ -20,50 +20,46 @@ import SwiftUI
 import WhiskyKit
 
 struct WhiskyWineInstallView: View {
-    @State var installing: Bool = true
+    @State private var failure: String?
+    @State private var attempt = 0
     @Binding var tarLocation: URL
+    @Binding var graphicsLocation: URL
     @Binding var path: [SetupStage]
     @Binding var showSetup: Bool
 
     var body: some View {
-        VStack {
-            VStack {
-                Text("setup.whiskywine.install")
-                    .font(.title)
-                    .fontWeight(.bold)
-                Text("setup.whiskywine.install.subtitle")
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
-                Spacer()
-                if installing {
-                    ProgressView()
-                        .progressViewStyle(.circular)
-                        .frame(width: 80)
-                } else {
-                    Image(systemName: "checkmark.circle")
-                        .resizable()
-                        .frame(width: 80, height: 80)
-                        .foregroundStyle(.green)
+        VStack(spacing: 18) {
+            Text("setup.whiskywine.install").font(.title).bold()
+            if let failure {
+                Text(failure).foregroundStyle(.red).textSelection(.enabled)
+                HStack {
+                    Button("setup.retry") { attempt += 1 }
+                    Button("runtime.download.again") {
+                        try? FileManager.default.removeItem(at: tarLocation)
+                        try? FileManager.default.removeItem(at: graphicsLocation)
+                        path.removeLast()
+                    }
                 }
-                Spacer()
-            }
-            Spacer()
-        }
-        .frame(width: 400, height: 200)
-        .onAppear {
-            Task.detached {
-                await WhiskyWineInstaller.install(from: tarLocation)
-                await MainActor.run {
-                    installing = false
-                }
-                sleep(2)
-                await proceed()
+            } else {
+                ProgressView()
+                Text("runtime.install.verifying").foregroundStyle(.secondary)
             }
         }
-    }
-
-    @MainActor
-    func proceed() {
-        showSetup = false
+        .frame(width: 440, height: 240)
+        .task(id: attempt) {
+            failure = nil
+            let archive = tarLocation
+            let graphicsArchive = graphicsLocation
+            do {
+                try await Task.detached(priority: .userInitiated) {
+                    try WhiskyWineInstaller.install(from: archive, graphicsArchive: graphicsArchive)
+                }.value
+                try? FileManager.default.removeItem(at: archive)
+                try? FileManager.default.removeItem(at: graphicsArchive)
+                showSetup = false
+            } catch {
+                failure = error.localizedDescription
+            }
+        }
     }
 }
